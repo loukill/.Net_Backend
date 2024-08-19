@@ -23,7 +23,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSwaggerGen(option => {
     option.SwaggerDoc("v1", new OpenApiInfo { Title = "Demo API", Version = "v1" });
-    option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
+    option.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
         In = ParameterLocation.Header,
         Description = "Please enter a valid token",
         Name = "Authorization",
@@ -63,23 +64,26 @@ builder.Services.AddAuthentication(options => {
     options.DefaultScheme =
     options.DefaultSignInScheme =
     options.DefaultSignOutScheme = JwtBearerDefaults.AuthenticationScheme;
-}).AddJwtBearer(options =>{
-    options.TokenValidationParameters = new TokenValidationParameters {
+}).AddJwtBearer(options => {
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero,
-        ValidateIssuer = true,
+        ValidateIssuer = false,
         ValidIssuer = builder.Configuration["JWT:Issuer"],
-        ValidateAudience = true,
+        ValidateAudience = false,
         ValidAudience = builder.Configuration["JWT:Audience"],
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(
-            System.Text.Encoding.UTF8.GetBytes(builder.Configuration["JWT:SigningKey"])
-        )
+        System.Text.Encoding.UTF8.GetBytes(builder.Configuration["JWT:SigningKey"])
+    )
     };
-    options.Events = new JwtBearerEvents {
+    options.Events = new JwtBearerEvents
+    {
         OnMessageReceived = context =>
         {
-            context.Token = context.Request.Cookies["Access-Token"];
+            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+            context.Token = token;
             return Task.CompletedTask;
         }
     };
@@ -101,7 +105,7 @@ builder.Services.AddDbContext<AppDbContext>(
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserRepo, UserRepo>();
 builder.Services.AddScoped<IServiceRepo, ServiceRepo>();
-builder.Services.AddScoped<IEventRepo,  EventRepo>();
+builder.Services.AddScoped<IEventRepo, EventRepo>();
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -113,14 +117,16 @@ if (args.Length == 1 && args[0] == "seed-users-and-roles")
 }
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment()) {
+if (app.Environment.IsDevelopment())
+{
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
 
-app.UseCookiePolicy(new CookiePolicyOptions {
+app.UseCookiePolicy(new CookiePolicyOptions
+{
     MinimumSameSitePolicy = SameSiteMode.Strict,
     HttpOnly = HttpOnlyPolicy.Always,
     Secure = CookieSecurePolicy.Always

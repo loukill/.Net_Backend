@@ -41,23 +41,27 @@ namespace AuthApp.Services
 
             return tokenDto;
         }
-        public async Task<string> GenerateAccessToken(AppUser user) {
+        public async Task<string> GenerateAccessToken(AppUser user)
+        {
             var claims = new List<Claim>
-            {
-                new Claim(JwtRegisteredClaimNames.Email, user.Email),
-                new Claim(JwtRegisteredClaimNames.GivenName, user.UserName)
-            };
+    {
+        new Claim(JwtRegisteredClaimNames.Email, user.Email),
+        new Claim(JwtRegisteredClaimNames.GivenName, user.UserName),
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id)
+    };
 
             var userRoles = await _userManager.GetRolesAsync(user);
-            foreach (var userRole in userRoles) {
+            foreach (var userRole in userRoles)
+            {
                 claims.Add(new Claim(ClaimTypes.Role, userRole));
             }
 
             var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
 
-            var tokenDescriptor = new SecurityTokenDescriptor {
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.Now.AddMinutes(15),
+                Expires = DateTime.Now.AddMinutes(30),
                 SigningCredentials = creds,
                 Issuer = _config["JWT:Issuer"],
                 Audience = _config["JWT:Audience"]

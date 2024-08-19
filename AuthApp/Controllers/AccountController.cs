@@ -38,6 +38,14 @@ namespace AuthApp.Controllers
 
             var tokenDto = await _tokenService.CreateTokenDto(user, populateExp: true);
 
+            var response = new
+            {
+                AccessToken = tokenDto.AccessToken,
+                RefreshToken = tokenDto.RefreshToken,
+                UserId = user.Id,
+                UserRole = user.RoleUser
+            };
+
             HttpContext.Response.Cookies.Append("Access-Token", tokenDto.AccessToken);
             HttpContext.Response.Cookies.Append("Username", user.UserName);
             HttpContext.Response.Cookies.Append("Refresh-Token", tokenDto.RefreshToken,
@@ -45,9 +53,9 @@ namespace AuthApp.Controllers
                     HttpOnly = true,
                     Expires = user.RefreshTokenExpires
                 }
-            );
+            ) ;
 
-            return Ok(tokenDto);
+            return Ok(response);
         }
 
         [HttpPost("register")]
@@ -80,6 +88,14 @@ namespace AuthApp.Controllers
                     {
                         var tokenDto = await _tokenService.CreateTokenDto(appUser, populateExp: true);
 
+                        var response = new
+                        {
+                            AccessToken = tokenDto.AccessToken,
+                            RefreshToken = tokenDto.RefreshToken,
+                            UserId = appUser.Id,
+                            UserRole = appUser.RoleUser
+                        };
+
                         HttpContext.Response.Cookies.Append("Access-Token", tokenDto.AccessToken);
                         HttpContext.Response.Cookies.Append("Username", appUser.UserName);
                         HttpContext.Response.Cookies.Append("Refresh-Token", tokenDto.RefreshToken,
@@ -90,7 +106,7 @@ namespace AuthApp.Controllers
                             }
                         );
 
-                        return Ok(tokenDto);
+                        return Ok(response);
                     }
                     else
                     {

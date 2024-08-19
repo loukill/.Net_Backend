@@ -1,4 +1,5 @@
-﻿using AuthApp.Data;
+﻿using AuthApp.Constants;
+using AuthApp.Data;
 using AuthApp.Models;
 using AuthApp.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +48,37 @@ namespace AuthApp.Services
         public async Task SaveAsync()
         {
             await _context.SaveChangesAsync();
+        }
+        public async Task AcceptEventAsync(int eventId, string prestataireId)
+        {
+            var eventItem = await _context.Events.FindAsync(eventId);
+            if (eventItem != null && eventItem.PrestataireId == prestataireId)
+            {
+                eventItem.EventStatus = EventStatus.Accepted;
+                eventItem.PrestataireResponse = "Accepted";
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        public async Task RejectEventAsync(int eventId, string prestataireId)
+        {
+            var eventItem = await _context.Events.FindAsync(eventId);
+            if (eventItem != null && eventItem.PrestataireId == prestataireId)
+            {
+                eventItem.EventStatus = EventStatus.Rejected;
+                eventItem.PrestataireResponse = "Rejected";
+                await _context.SaveChangesAsync();
+            }
+        }
+        public async Task CompleteEventAsync(int eventId, string prestataireId)
+        {
+            var eventItem = await _context.Events.FindAsync(eventId);
+            if (eventItem != null && eventItem.PrestataireId == prestataireId)
+            {
+                eventItem.EventStatus = EventStatus.Completed;
+                eventItem.CompletionDate = DateTime.UtcNow; // Optional: Record the completion date
+                await _context.SaveChangesAsync();
+            }
         }
     }
 }
