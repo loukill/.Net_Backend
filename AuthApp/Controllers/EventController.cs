@@ -92,7 +92,8 @@ namespace AuthApp.Controllers
                 EventStatus = eventItem.EventStatus.ToString(),
                 PrestataireId = eventItem.PrestataireId,
                 PrestataireName = eventItem.PrestataireName,
-                AdminName = eventItem.AdminName
+                AdminName = eventItem.AdminName,
+                ClientName = eventItem.ClientName
             };
 
             return Ok(eventDto);
@@ -135,11 +136,37 @@ namespace AuthApp.Controllers
                 return NotFound("Event not found.");
             }
 
-            eventItem.Description = updatedEventDto.Description;
-            eventItem.DateRequest = updatedEventDto.DateRequest;
-            eventItem.EventStatus = Enum.Parse<EventStatus>(updatedEventDto.EventStatus);
-            eventItem.PrestataireId = updatedEventDto.PrestataireId;
+            if (!string.IsNullOrWhiteSpace(updatedEventDto.Description))
+            {
+                eventItem.Description = updatedEventDto.Description;
+            }
 
+            if (updatedEventDto.DateRequest != null)
+            {
+                eventItem.DateRequest = updatedEventDto.DateRequest;
+            }
+
+            if (!string.IsNullOrWhiteSpace(updatedEventDto.EventStatus))
+            {
+                eventItem.EventStatus = Enum.Parse<EventStatus>(updatedEventDto.EventStatus);
+            }
+
+            if (!string.IsNullOrWhiteSpace(updatedEventDto.PrestataireName))
+            {
+                eventItem.PrestataireName = updatedEventDto.PrestataireName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(updatedEventDto.ClientName))
+            {
+                eventItem.ClientName = updatedEventDto.ClientName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(updatedEventDto.AdminName))
+            {
+                eventItem.AdminName = updatedEventDto.AdminName;
+            }
+
+            // Save changes to the database
             await _eventRepo.UpdateAsync(eventItem);
             await _eventRepo.SaveAsync();
 
@@ -180,7 +207,7 @@ namespace AuthApp.Controllers
             if (!string.IsNullOrEmpty(givenName))
             {
                 var client = await _userRepo.GetByNameAsync(givenName);
-                if (client != null && client.RoleUser == UserRoles.Client.ToString())
+                if (client != null && client.RoleUser == UserRoles.Client)
                 {
                     clientId = client.Id;
                 }
@@ -193,7 +220,7 @@ namespace AuthApp.Controllers
                     return BadRequest("Client name must be provided if client is not authenticated.");
 
                 var client = await _userRepo.GetByNameAsync(request.ClientName);
-                if (client == null || client.RoleUser != UserRoles.Client.ToString())
+                if (client == null || client.RoleUser != UserRoles.Client)
                     return BadRequest("Invalid client name.");
 
                 clientId = client.Id;
@@ -213,14 +240,14 @@ namespace AuthApp.Controllers
             if (!string.IsNullOrEmpty(request.PrestataireName))
             {
                 var prestataire = await _userRepo.GetByNameAsync(request.PrestataireName);
-                if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire.ToString())
+                if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
                     return BadRequest("Invalid prestataire name.");
                 prestataireId = prestataire.Id;
             }
             if (!string.IsNullOrEmpty(request.AdminName))
             {
                 var admin = await _userRepo.GetByNameAsync(request.AdminName);
-                if (admin == null || admin.RoleUser != UserRoles.Admin.ToString())
+                if (admin == null || admin.RoleUser != UserRoles.Admin)
                     return BadRequest("Invalid admin name.");
                 adminId = admin.Id;
             }
@@ -236,7 +263,8 @@ namespace AuthApp.Controllers
                 PrestataireId = prestataireId,
                 AdminId = adminId,
                 PrestataireName = request.PrestataireName,
-                AdminName = request.AdminName
+                AdminName = request.AdminName,
+                ClientName = request.ClientName
             };
 
             await _eventRepo.AddAsync(newRequest);
@@ -253,30 +281,74 @@ namespace AuthApp.Controllers
                 PrestataireId = newRequest.PrestataireId,
                 PrestataireName = newRequest.PrestataireName,
                 AdminId = newRequest.AdminId,
-                AdminName = newRequest.AdminName
+                AdminName = newRequest.AdminName,
+                ClientName = newRequest.ClientName
             });
         }
 
-
+        [Authorize]
         [HttpPost("assignrequest")]
-        public async Task<IActionResult> AssignRequestToPrestataire(int eventId, string prestataireName)
+        public async Task<IActionResult> AssignRequestToPrestataire([FromBody] AssignRequestDto request)
         {
-            var eventItem = await _eventRepo.GetByIdAsync(eventId);
+            // Vérifier le rôle de l'utilisateur
+            var (userRole, givenName) = GetUserRoleAndName();
+
+            if (!IsAuthorizedToAssign(userRole))
+                return Unauthorized("Only admins and prestataires can assign events.");
+
+            // Récupérer l'événement et vérifier son existence
+            var eventItem = await _eventRepo.GetByIdAsync(request.EventId);
             if (eventItem == null)
                 return NotFound("Event not found.");
 
-            var prestataire = await _userRepo.GetByNameAsync(prestataireName);
-            if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire.ToString())
-                return BadRequest("Invalid prestataire name.");
+            // Récupérer et vérifier le prestataire
+            var prestataire = await GetValidPrestataire(request.PrestataireName);
+            if (prestataire == null)
+                return BadRequest("Invalid prestataire name or role.");
 
+            // Règle spéciale pour les prestataires : ils ne peuvent s'assigner qu'à eux-mêmes
+            if (userRole == UserRoles.Prestataire.ToString() && givenName != request.PrestataireName)
+                return BadRequest("Prestataire can only assign the event to themselves.");
+
+            // Assignation de l'événement
+            await AssignEventToPrestataire(eventItem, prestataire);
+
+            // Retourner l'événement mis à jour
+            return Ok(MapToEventDto(eventItem));
+        }
+
+        private (string userRole, string givenName) GetUserRoleAndName()
+        {
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            var givenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
+            return (userRole, givenName);
+        }
+
+        private bool IsAuthorizedToAssign(string userRole)
+        {
+            return !string.IsNullOrEmpty(userRole) &&
+                   (userRole == UserRoles.Admin.ToString() || userRole == UserRoles.Prestataire.ToString());
+        }
+
+        private async Task<AppUser> GetValidPrestataire(string prestataireName)
+        {
+            var prestataire = await _userRepo.GetByNameAsync(prestataireName);
+            return prestataire?.RoleUser == UserRoles.Prestataire ? prestataire : null;
+        }
+
+        private async Task AssignEventToPrestataire(Events eventItem, AppUser prestataire)
+        {
             eventItem.PrestataireId = prestataire.Id;
+            eventItem.PrestataireName = prestataire.UserName;
             eventItem.EventStatus = EventStatus.Assigned;
 
             await _eventRepo.UpdateAsync(eventItem);
             await _eventRepo.SaveAsync();
+        }
 
-            // Retournez la réponse avec les détails de l'événement mis à jour
-            return Ok(new EventDto
+        private EventDto MapToEventDto(Events eventItem)
+        {
+            return new EventDto
             {
                 Id = eventItem.Id,
                 ClientId = eventItem.ClientId,
@@ -285,8 +357,9 @@ namespace AuthApp.Controllers
                 EventStatus = eventItem.EventStatus.ToString(),
                 PrestataireId = eventItem.PrestataireId,
                 PrestataireName = eventItem.PrestataireName
-            });
+            };
         }
+
 
         [Authorize]
         [HttpPost("accept/{eventId}")]
@@ -336,7 +409,7 @@ namespace AuthApp.Controllers
 
             // Récupérer le prestataire associé à l'événement par son given_name
             var prestataire = await _userRepo.GetByNameAsync(givenName);
-            if (prestataire == null || prestataire.RoleUser != "Prestataire")
+            if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
             {
                 _logger.LogWarning("User with given name {GivenName} is not a valid Prestataire", givenName);
                 return Forbid();
@@ -424,7 +497,7 @@ namespace AuthApp.Controllers
 
             // Récupérer le prestataire associé à l'événement par son given_name
             var prestataire = await _userRepo.GetByNameAsync(givenName);
-            if (prestataire == null || prestataire.RoleUser != "Prestataire")
+            if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
             {
                 _logger.LogWarning("User with given name {GivenName} is not a valid Prestataire", givenName);
                 return Forbid();
@@ -507,7 +580,7 @@ namespace AuthApp.Controllers
 
             // Récupérer le prestataire en fonction du given_name
             var prestataire = await _userRepo.GetByNameAsync(givenName);
-            if (prestataire == null || prestataire.RoleUser != "Prestataire")
+            if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
             {
                 return Forbid("You do not have permission to complete this event.");
             }

@@ -61,7 +61,7 @@ namespace AuthApp.Controllers {
             {
                 UserName = registerDto.UserName,
                 Email = registerDto.Email,
-                RoleUser = registerDto.RoleUser.ToString()
+                RoleUser = (UserRoles)registerDto.RoleUser
             };
 
             var password = "DefaultPassword123!";

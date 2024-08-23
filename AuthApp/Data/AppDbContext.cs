@@ -1,4 +1,5 @@
 ﻿using AuthApp.Configurations;
+using AuthApp.Constants;
 using AuthApp.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -38,6 +39,13 @@ namespace AuthApp.Data {
                 .WithMany(u => u.AssignedRequests)
                 .HasForeignKey(e => e.PrestataireId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<AppUser>()
+        .Property(u => u.RoleUser)
+        .HasConversion(
+            v => v.ToString(),
+            v => (UserRoles)Enum.Parse(typeof(UserRoles), v))
+        .HasColumnType("text");
 
             base.OnModelCreating(modelBuilder);
         }

@@ -1,4 +1,5 @@
-﻿using AuthApp.Data;
+﻿using AuthApp.Constants;
+using AuthApp.Data;
 using AuthApp.DTOs;
 using AuthApp.Models;
 using AuthApp.Services.Interfaces;
@@ -47,14 +48,10 @@ namespace AuthApp.Services
     {
         new Claim(JwtRegisteredClaimNames.Email, user.Email),
         new Claim(JwtRegisteredClaimNames.GivenName, user.UserName),
-        new Claim(JwtRegisteredClaimNames.Sub, user.Id)
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id),
     };
 
-            var userRoles = await _userManager.GetRolesAsync(user);
-            foreach (var userRole in userRoles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, userRole));
-            }
+            claims.Add(new Claim(ClaimTypes.Role, user.RoleUser.ToString()));
 
             var creds = new SigningCredentials(_key, SecurityAlgorithms.HmacSha512Signature);
 
@@ -68,7 +65,6 @@ namespace AuthApp.Services
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
-
             var token = tokenHandler.CreateToken(tokenDescriptor);
 
             return tokenHandler.WriteToken(token);

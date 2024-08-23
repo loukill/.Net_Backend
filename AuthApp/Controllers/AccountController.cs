@@ -77,7 +77,7 @@ namespace AuthApp.Controllers
                 {
                     UserName = registerDto.UserName,
                     Email = registerDto.Email,
-                    RoleUser = registerDto.RoleUser.ToString() 
+                    RoleUser = (UserRoles)registerDto.RoleUser
                 };
 
                 var createdUser = await _userManager.CreateAsync(appUser, registerDto.Password);

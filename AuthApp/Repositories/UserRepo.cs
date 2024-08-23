@@ -32,7 +32,7 @@ namespace AuthApp.Services
         public async Task<IEnumerable<UserDto>> GetAllPrestAsync()
         {
             var users = await _userManager.Users
-                                          .Where(u => u.RoleUser == UserRoles.Prestataire.ToString())
+                                          .Where(u => u.RoleUser == UserRoles.Prestataire)
                                           .ToListAsync();
 
             var userDtos = users.Select(user => new UserDto
@@ -48,7 +48,7 @@ namespace AuthApp.Services
         public async Task<IEnumerable<UserDto>> GetAllClientAsync()
         {
             var users = await _userManager.Users
-                                          .Where(u => u.RoleUser == UserRoles.Client.ToString())
+                                          .Where(u => u.RoleUser == UserRoles.Client)
                                           .ToListAsync();
 
             var userDtos = users.Select(user => new UserDto
@@ -98,7 +98,7 @@ namespace AuthApp.Services
             existingUser.Email = user.Email;
 
             var existingRoles = await _userManager.GetRolesAsync(existingUser);
-            var newRole = user.RoleUser;
+            var newRole = user.RoleUser.ToString();
 
             if (!existingRoles.Contains(newRole))
             {

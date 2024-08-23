@@ -15,6 +15,7 @@ namespace AuthApp.Models
         public string Description { get; set; } = string.Empty;
         public string? PrestataireName { get; set; }
         public string? AdminName { get; set; }
+        public string? ClientName { get; set; }
         public string? PrestataireResponse { get; set; }
         public DateTime? CompletionDate { get; set; }
 

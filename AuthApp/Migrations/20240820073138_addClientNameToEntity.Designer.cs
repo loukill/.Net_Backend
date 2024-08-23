@@ -3,6 +3,7 @@ using System;
 using AuthApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AuthApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240820073138_addClientNameToEntity")]
+    partial class addClientNameToEntity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -220,19 +222,19 @@ namespace AuthApp.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "38605efd-ba0c-48b6-b53c-c6ef7e4beac9",
+                            Id = "2614fc3a-ea9e-4714-be75-4dcc4536cc7c",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "f21e2499-5db8-4c7b-a49c-f5ab5252aff0",
+                            Id = "b322189e-7dbc-4d0d-b9bc-6759b0854be3",
                             Name = "Prestataire",
                             NormalizedName = "PRESTATAIRE"
                         },
                         new
                         {
-                            Id = "eecc6d50-c3d9-49d7-b662-91273124b584",
+                            Id = "35925225-3e63-4a80-8121-f4d36a668176",
                             Name = "Client",
                             NormalizedName = "CLIENT"
                         });
