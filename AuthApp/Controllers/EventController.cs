@@ -550,7 +550,6 @@ namespace AuthApp.Controllers
                 return Unauthorized("Access token not found.");
             }
 
-            // Désérialiser le token JWT pour récupérer le given_name
             var handler = new JwtSecurityTokenHandler();
             JwtSecurityToken jwtToken;
 

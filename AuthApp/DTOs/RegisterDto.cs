@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace AuthApp.DTOs {
     public class RegisterDto {
+        public string? UserId { get; set; }
         [Required]
         public string? UserName { get; set; } 
         [Required]

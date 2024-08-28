@@ -3,6 +3,7 @@ using System;
 using AuthApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AuthApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240826163110_MailVerification")]
+    partial class MailVerification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -39,9 +41,6 @@ namespace AuthApp.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsApproved")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsValidated")
@@ -226,19 +225,19 @@ namespace AuthApp.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "10d94c93-d407-4169-ab2c-5fb5a62868bf",
+                            Id = "c6ae1db0-f651-42b4-85c1-4b5127bee888",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "2d3fab43-5dbe-427d-90fb-2ece997008b7",
+                            Id = "c4439524-510c-412f-a5ab-78d89192e6a5",
                             Name = "Prestataire",
                             NormalizedName = "PRESTATAIRE"
                         },
                         new
                         {
-                            Id = "f6df3877-83c2-4de8-935e-56eb03c58e83",
+                            Id = "9bdcb1b4-82c9-4669-ace8-92c6ad12974c",
                             Name = "Client",
                             NormalizedName = "CLIENT"
                         });

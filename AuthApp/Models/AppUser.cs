@@ -7,6 +7,8 @@ namespace AuthApp.Models {
         public string RefreshToken { get; set; } = string.Empty;
         public DateTime RefreshTokenExpires { get; set; }
         public UserRoles RoleUser { get; set; }
+        public Boolean IsValidated { get; set; }
+        public Boolean IsApproved { get; set; }
         public ICollection<UserService> UserServices { get; set; }
         public virtual ICollection<Events> CreatedRequests { get; set; } 
         public virtual ICollection<Events> AssignedRequests { get; set; }
