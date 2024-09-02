@@ -40,6 +40,7 @@ namespace AuthApp.Controllers {
             }
         }
 
+        [Authorize(Roles ="Admin")]
         [HttpGet("prestataires")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetPrestataires()
         {
@@ -47,6 +48,7 @@ namespace AuthApp.Controllers {
             return Ok(prestataires);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("clients")]
         public async Task<ActionResult<IEnumerable<UserDto>>> GetClients()
         {
@@ -75,22 +77,45 @@ namespace AuthApp.Controllers {
 
             return BadRequest(result.Errors);
         }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetUserById(string id)
+        {
+            var user = await _userRepo.GetByIdAsync(id);
+
+            if (user == null)
+            {
+                return NotFound("User not found.");
+            }
+
+            var userDto = new UserDto
+            {
+                Id = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                RoleUser = user.RoleUser
+            };
+
+            return Ok(userDto);
+        }
+
         [HttpPut("update")]
         public async Task<IActionResult> UpdateUser([FromBody] UserDto userDto)
         {
-            var user = new AppUser
+            var existingUser = await _userRepo.GetByIdAsync(userDto.Id);
+            if (existingUser == null)
             {
-                Id = userDto.Id,
-                UserName = userDto.UserName,
-                Email = userDto.Email,
-                RoleUser = userDto.RoleUser
-            };
+                return NotFound(new { message = "User not found." });
+            }
 
-            var result = await _userRepo.UpdateUserAsync(user);
+            existingUser.UserName = userDto.UserName ?? existingUser.UserName;
+            existingUser.Email = userDto.Email ?? existingUser.Email;
+
+            var result = await _userRepo.UpdateUserAsync(existingUser);
 
             if (result.Succeeded)
             {
-                return Ok("User updated successfully.");
+                return Ok(new { message = "User updated successfully." });
             }
 
             return BadRequest(result.Errors);

@@ -3,6 +3,7 @@ using System;
 using AuthApp.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AuthApp.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240828073844_MakeRefreshTokenExpiresNullable")]
+    partial class MakeRefreshTokenExpiresNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,6 +73,7 @@ namespace AuthApp.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("RefreshToken")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime?>("RefreshTokenExpires")
@@ -157,28 +160,6 @@ namespace AuthApp.Migrations
                     b.ToTable("Events");
                 });
 
-            modelBuilder.Entity("AuthApp.Models.PasswordResetToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp without time zone");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("PasswordResetTokens");
-                });
-
             modelBuilder.Entity("AuthApp.Models.Service", b =>
                 {
                     b.Property<int>("Id")
@@ -247,19 +228,19 @@ namespace AuthApp.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "c7b313b7-8d4b-4a28-89a1-483e1b5f38c1",
+                            Id = "b30f6721-ba26-46d9-ac1b-17afca4e7d5e",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "6014d24d-0b05-4edd-8226-381043793c9f",
+                            Id = "cc6ac5b7-b746-4992-9474-1c46cc883a7e",
                             Name = "Prestataire",
                             NormalizedName = "PRESTATAIRE"
                         },
                         new
                         {
-                            Id = "57081f55-dc91-4650-a2af-3750c0edccff",
+                            Id = "e74cfd06-fb2f-426d-845b-bef3c913abc2",
                             Name = "Client",
                             NormalizedName = "CLIENT"
                         });

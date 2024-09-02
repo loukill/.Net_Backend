@@ -58,37 +58,6 @@ namespace AuthApp.Controllers
             return View("~/Views/Admin/ConfirmEmail.cshtml", model);
         }
 
-        /* [HttpGet("validate-user")]
-         public async Task<IActionResult> ValidateUser([FromQuery] string userId)
-         {
-             if (string.IsNullOrEmpty(userId))
-             {
-                 return BadRequest("Invalid request");
-             }
-
-             var user = await _userManager.FindByIdAsync(userId);
-             if (user == null)
-             {
-                 return NotFound("User not found");
-             }
-
-             // Confirm the user's email and validate the user
-             // Assuming token validation is handled separately
-
-             user.IsValidated = true;
-             var result = await _userManager.UpdateAsync(user);
-
-             if (result.Succeeded)
-             {
-                 return Ok("User validated successfully");
-             }
-             else
-             {
-                 return StatusCode(500, "Validation failed");
-             }
-         }*/
-
-
         [HttpPost("approveuser")]
         public async Task<IActionResult> ApproveUser([FromForm] string userId)
         {

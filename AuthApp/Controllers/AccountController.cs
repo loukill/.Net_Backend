@@ -10,25 +10,29 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Identity.UI.Services;
+
 
 namespace AuthApp.Controllers
 {
     [ApiController]
     [Route("api/account")]
-    public class AccountController : Controller {
+    public class AccountController : Controller
+    {
         private readonly UserManager<AppUser> _userManager;
         private readonly ITokenService _tokenService;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
-        public AccountController(UserManager<AppUser> userManager, ITokenService tokenService, SignInManager<AppUser> signinManager, IEmailService emailService, IConfiguration configuration)
+        private readonly ILogger<AccountController> _logger;
+        public AccountController(UserManager<AppUser> userManager, ITokenService tokenService, SignInManager<AppUser> signinManager, IEmailService emailService, IConfiguration configuration, ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _tokenService = tokenService;
             _signInManager = signinManager;
             _emailService = emailService;
             _configuration = configuration;
-
+            _logger = logger;
         }
 
         [HttpPost("login")]
@@ -48,13 +52,6 @@ namespace AuthApp.Controllers
                 return Unauthorized("Invalid username or password!");
             }
 
-            // Vérification de l'e-mail confirmé
-           /* if (!await _userManager.IsEmailConfirmedAsync(user))
-            {
-                return Unauthorized("Email not confirmed. Please check your email.");
-            }*/
-
-            // Vérification si l'utilisateur est validé par l'administrateur
             if (!user.IsValidated)
             {
                 return Unauthorized("Your account has not been validated by the admin yet.");
@@ -113,21 +110,32 @@ namespace AuthApp.Controllers
         {
             try
             {
+                // Validate the model
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
                 }
 
+                // Check if the email is provided
                 if (string.IsNullOrEmpty(registerDto.Email))
                 {
                     return BadRequest("Email cannot be null or empty.");
                 }
 
+                // Check if the email already exists in the system
+                var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
+                if (existingUser != null)
+                {
+                    return BadRequest("Email is already in use. Please choose a different email.");
+                }
+
+                // Validate the user role
                 if (!Enum.IsDefined(typeof(UserRoles), registerDto.RoleUser))
                 {
                     return BadRequest("Invalid role specified.");
                 }
 
+                // Create the user
                 var appUser = new AppUser
                 {
                     UserName = registerDto.UserName,
@@ -138,8 +146,10 @@ namespace AuthApp.Controllers
 
                 var createdUser = await _userManager.CreateAsync(appUser, registerDto.Password);
 
+                // Check if the user creation was successful
                 if (createdUser.Succeeded)
                 {
+                    // Assign the role to the user
                     var roleResult = await _userManager.AddToRoleAsync(appUser, registerDto.RoleUser.ToString());
                     if (roleResult.Succeeded)
                     {
@@ -158,13 +168,14 @@ namespace AuthApp.Controllers
                 }
                 else
                 {
+                    // Clean up by deleting the user if creation failed
                     await _userManager.DeleteAsync(appUser);
                     return StatusCode(500, createdUser.Errors);
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex);
+                return StatusCode(500, ex.Message); // Return a more descriptive error message
             }
         }
 
@@ -179,47 +190,6 @@ namespace AuthApp.Controllers
 
             return Ok(new { IsValidated = user.IsValidated });
         }
-
-
-        /*    [HttpGet("ConfirmEmail")]
-            public async Task<IActionResult> ConfirmEmail(string userId, string token)
-            {
-                if (string.IsNullOrEmpty(userId) || string.IsNullOrEmpty(token))
-                {
-                    return BadRequest("User ID and token are required.");
-                }
-
-                var user = await _userManager.FindByIdAsync(userId);
-                if (user == null)
-                {
-                    return NotFound($"Unable to load user with ID '{userId}'.");
-                }
-
-                var result = await _userManager.ConfirmEmailAsync(user, token);
-                if (result.Succeeded)
-                {
-                    return Ok("Email confirmed successfully!");
-                }
-                else
-                {
-                    return BadRequest("Email confirmation failed.");
-                }
-            }*/
-
-        /*      [HttpPost("validate-user/{userId}")]
-              public async Task<IActionResult> ValidateUser(string userId)
-              {
-                  var user = await _userManager.FindByIdAsync(userId);
-                  if (user == null)
-                  {
-                      return NotFound("User not found.");
-                  }
-
-                  user.IsValidated = true;
-                  await _userManager.UpdateAsync(user);
-
-                  return Ok("User validated successfully!");
-              }*/
 
         [HttpGet("userdetails")]
         public async Task<IActionResult> GetUserDetails(string userId)
@@ -240,57 +210,83 @@ namespace AuthApp.Controllers
             return Ok(userDetails);
         }
 
-        /*[HttpPost("validate")]
-        public async Task<IActionResult> ValidateUser([FromBody] ValidateUserDto dto)
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] LogoutDto logoutDto)
         {
-            var user = await _userManager.FindByIdAsync(dto.UserId);
+            // Find the user by their ID or other identifier
+            var user = await _userManager.FindByIdAsync(logoutDto.UserId);
             if (user == null)
             {
-                return NotFound("User not found");
+                return NotFound("User not found.");
             }
 
-            // Check token validity here if needed
+            // Expire the refresh token by setting the expiration date to the past
+            user.RefreshTokenExpires = DateTime.UtcNow.AddDays(-1); // Set the token as expired
 
-            user.IsValidated = true;
+            // Optionally, clear the token to make it unusable
+            user.RefreshToken = string.Empty; // Or any other non-null value if your column is NOT NULL
+
             var result = await _userManager.UpdateAsync(user);
 
             if (result.Succeeded)
             {
-                return Ok();
+                return Ok(new { message = "Logout successful. Token expired." });
             }
             else
             {
-                return StatusCode(500, result.Errors);
+                return StatusCode(500, "An error occurred while logging out.");
             }
         }
 
-        [HttpPost("reject")]
-        public async Task<IActionResult> RejectUser([FromBody] RejectUserDto dto)
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto model)
         {
-            var user = await _userManager.FindByIdAsync(dto.UserId);
+            if (!ModelState.IsValid)
+                return BadRequest("Invalid request");
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null)
+                return BadRequest("User not found");
+
+            // Generate the password reset token
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            // Construct a secure reset link
+            // This URL should align with your Angular app's routing
+            var resetLink = $"{_configuration["AngularAppUrl"]}/reset-password?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(model.Email)}";
+
+            // Send the email with the reset link
+            await _emailService.SendEmailAsync(model.Email, "Reset Password",
+                $"Please reset your password by clicking <a href='{resetLink}'>here</a>");
+
+            return Ok("Password reset link has been sent to your email.");
+        }
+
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            if (string.IsNullOrEmpty(model.Token))
+                return BadRequest(new { error = "Token is required" });
+
+            if (string.IsNullOrEmpty(model.Email))
+                return BadRequest(new { error = "Email is required" });
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+                return BadRequest(new { error = "User not found" });
+
+            var resetPassResult = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
+            if (!resetPassResult.Succeeded)
             {
-                return NotFound("User not found");
+                var errorMessage = string.Join(", ", resetPassResult.Errors.Select(e => e.Description));
+                return BadRequest(new { error = errorMessage });
             }
 
-            // Optionally: delete the user or mark them as rejected
-            var result = await _userManager.DeleteAsync(user);
+            return Ok(new { message = "Password has been reset successfully." });
+        }
 
-            if (result.Succeeded)
-            {
-                return Ok();
-            }
-            else
-            {
-                return StatusCode(500, result.Errors);
-            }
-        }
-*/
-        [Authorize]
-        [HttpGet("logout")]
-        public async Task<IActionResult> Logout() {
-            // magic code 
-            return Ok();
-        }
     }
 }

@@ -94,5 +94,68 @@ namespace AuthApp.Repositories
                 throw new InvalidOperationException($"Email sending failed: {ex.Message}");
             }
         }
+        public async Task SendEmailAsync(string email, string subject, string htmlMessage)
+        {
+            if (string.IsNullOrEmpty(email))
+                throw new ArgumentNullException(nameof(email), "Email address cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(subject))
+                throw new ArgumentNullException(nameof(subject), "Subject cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(htmlMessage))
+                throw new ArgumentNullException(nameof(htmlMessage), "Email message cannot be null or empty.");
+
+            var smtpServer = _configuration["EmailSettings:SmtpServer"];
+            var portString = _configuration["EmailSettings:Port"];
+            var username = _configuration["EmailSettings:Username"];
+            var password = _configuration["EmailSettings:Password"];
+            var enableSslString = _configuration["EmailSettings:EnableSsl"];
+
+            if (string.IsNullOrEmpty(smtpServer))
+                throw new ArgumentNullException(nameof(smtpServer), "SMTP server cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(portString))
+                throw new ArgumentNullException(nameof(portString), "SMTP port cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(username))
+                throw new ArgumentNullException(nameof(username), "SMTP username cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(password))
+                throw new ArgumentNullException(nameof(password), "SMTP password cannot be null or empty.");
+
+            if (string.IsNullOrEmpty(enableSslString))
+                throw new ArgumentNullException(nameof(enableSslString), "SMTP SSL enable flag cannot be null or empty.");
+
+            if (!int.TryParse(portString, out var port))
+                throw new ArgumentException("SMTP port must be a valid integer.", nameof(portString));
+
+            if (!bool.TryParse(enableSslString, out var enableSsl))
+                throw new ArgumentException("SMTP SSL enable flag must be a valid boolean.", nameof(enableSslString));
+
+            var mailMessage = new MailMessage
+            {
+                From = new MailAddress(username),
+                Subject = subject,
+                Body = htmlMessage,
+                IsBodyHtml = true
+            };
+            mailMessage.To.Add(email);
+
+            using (var smtpClient = new SmtpClient(smtpServer, port)
+            {
+                Credentials = new NetworkCredential(username, password),
+                EnableSsl = enableSsl
+            })
+            {
+                try
+                {
+                    await smtpClient.SendMailAsync(mailMessage);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Email sending failed: {ex.Message}");
+                }
+            }
+        }
     }
 }

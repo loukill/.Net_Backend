@@ -12,6 +12,7 @@ namespace AuthApp.Data {
         public DbSet<Service> Services { get; set; }
         public DbSet<UserService> UserServices { get; set; }
         public DbSet<Events> Events { get; set; }
+        public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
             modelBuilder.ApplyConfiguration(new RolesConfiguration());
 
@@ -39,6 +40,11 @@ namespace AuthApp.Data {
                 .WithMany(u => u.AssignedRequests)
                 .HasForeignKey(e => e.PrestataireId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+           modelBuilder.Entity<PasswordResetToken>(entity =>
+           {
+               entity.HasKey(e => e.Id); 
+           });
 
             modelBuilder.Entity<AppUser>()
         .Property(u => u.RoleUser)
