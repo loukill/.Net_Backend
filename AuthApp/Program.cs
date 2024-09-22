@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.Security.Claims;
 
@@ -21,6 +22,11 @@ builder.Services.AddControllersWithViews()
     .AddNewtonsoftJson(options =>
     {
         options.SerializerSettings.Converters.Add(new StringEnumConverter());
+    });
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(options =>
+    {
+        options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
     });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -117,6 +123,10 @@ builder.Services.AddScoped<IUserRepo, UserRepo>();
 builder.Services.AddScoped<IServiceRepo, ServiceRepo>();
 builder.Services.AddScoped<IEventRepo, EventRepo>();
 builder.Services.AddTransient<IEmailService, EmailService>();
+builder.Services.AddScoped<IServiceRepo, ServiceRepo>();
+builder.Services.AddScoped<IServiceService, ServiceService>();
+builder.Services.AddScoped<IPOSRepo, POSRepo>();
+builder.Services.AddScoped<IPOSService, POSService>();
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -145,11 +155,13 @@ app.UseCookiePolicy(new CookiePolicyOptions
 
 app.UseCors("MyPolicy");
 
+app.UseStaticFiles();
+
+app.UseRouting();
+
 app.UseAuthentication();
 
 app.UseAuthorization();
-
-app.UseRouting();
 
 app.UseEndpoints(endpoints =>
 {

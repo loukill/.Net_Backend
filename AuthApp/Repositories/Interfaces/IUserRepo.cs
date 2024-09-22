@@ -8,8 +8,9 @@ namespace AuthApp.Services.Interfaces
     {
         Task<AppUser> GetUserByUsernameAsync(string username);
         Task<IList<string>> GetUserRolesAsync(AppUser user);
-        Task<IEnumerable<UserDto>> GetAllPrestAsync();
-        Task<IEnumerable<UserDto>> GetAllClientAsync();
+        Task<IEnumerable<UserDto>> GetPrestatairesForAdminAsync(string adminId);
+        Task<IEnumerable<UserDto>> GetClientsForAdminAsync(string adminId);
+        Task<IEnumerable<PrestataireDto>> GetPrestatairesByPOSAsync(int posId);
         Task<IdentityResult> AddUserAsync(AppUser user, string password, string roleUser);
         Task<IdentityResult> UpdateUserAsync(AppUser user);
         Task<IdentityResult> DeleteUserAsync(string userId);

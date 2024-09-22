@@ -4,8 +4,9 @@ namespace AuthApp.Services.Interfaces
 {
     public interface IEventRepo
     {
-        Task<IEnumerable<Events>> GetAllAsync();
+        Task<List<Events>> GetAllAsync();
         Task<Events> GetByIdAsync(int id);
+        Task<IEnumerable<Events>> GetEventsByUserIdAsync(string userId);
         Task AddAsync(Events eventItem);
         Task UpdateAsync(Events eventItem);
         Task DeleteAsync(int id);

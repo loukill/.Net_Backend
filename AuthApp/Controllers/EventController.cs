@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
+using AuthApp.Repositories.Interfaces;
 
 namespace AuthApp.Controllers
 {
@@ -19,12 +20,16 @@ namespace AuthApp.Controllers
         private readonly IEventRepo _eventRepo;
         private readonly IUserRepo _userRepo;
         private readonly ILogger<EventController> _logger;
+        private readonly IPOSRepo _posRepo;
+        private readonly IServiceRepo _serviceRepo;
 
-        public EventController(IEventRepo eventRepo, IUserRepo userRepo, ILogger<EventController> logger)
+        public EventController(IEventRepo eventRepo, IUserRepo userRepo, ILogger<EventController> logger, IPOSRepo posRepo, IServiceRepo serviceRepo)
         {
             _eventRepo = eventRepo;
             _userRepo = userRepo;
             _logger = logger;
+            _posRepo = posRepo;
+            _serviceRepo = serviceRepo;
         }
 
         [HttpGet]
@@ -33,7 +38,8 @@ namespace AuthApp.Controllers
             var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            var events = await _eventRepo.GetAllAsync(); // Retrieve all events
+            // Retrieve all events with related POS and Admin data
+            var events = await _eventRepo.GetAllAsync();
 
             // Apply filtering based on the user's role
             if (userRole == "Client")
@@ -48,6 +54,7 @@ namespace AuthApp.Controllers
             }
             // Admin sees all events
 
+            // Map the filtered events to the EventDto
             var eventDtos = events.Select(e => new EventDto
             {
                 Id = e.Id,
@@ -57,11 +64,56 @@ namespace AuthApp.Controllers
                 EventStatus = e.EventStatus.ToString(),
                 PrestataireId = e.PrestataireId,
                 PrestataireName = e.PrestataireName,
-                AdminName = e.AdminName
+                AdminId = e.POS?.Admin?.Id,  // Access AdminId through POS
+                AdminName = e.POS?.Admin?.UserName,  // Access AdminName through POS
+                PosId = e.POS.POSId,
+                ServiceId = e.ServiceId
             }).ToList();
 
             return Ok(eventDtos);
         }
+
+        [HttpGet("pos/{posId}")]
+        public async Task<IActionResult> GetAllEventsForPos(int posId)
+        {
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            // Récupérer tous les événements
+            var events = await _eventRepo.GetAllAsync();
+
+            // Filtrer les événements en fonction du POS ID
+            events = events.Where(e => e.PosId == posId).ToList();
+
+            // Filtrer les événements en fonction du rôle de l'utilisateur
+            if (userRole == "Client")
+            {
+                // Filtrer les événements liés au client
+                events = events.Where(e => e.ClientId == userId).ToList();
+            }
+            else if (userRole == "Prestataire")
+            {
+                // Filtrer les événements liés au prestataire
+                events = events.Where(e => e.PrestataireId == userId).ToList();
+            }
+            // Admin voit tous les événements liés au POS
+
+            var eventDtos = events.Select(e => new EventDto
+            {
+                Id = e.Id,
+                ClientId = e.ClientId,
+                Description = e.Description,
+                DateRequest = e.DateRequest,
+                EventStatus = e.EventStatus.ToString(),
+                PrestataireId = e.PrestataireId,
+                PrestataireName = e.PrestataireName,
+                AdminName = e.AdminName,
+                PosId = e.PosId 
+            }).ToList();
+
+            return Ok(eventDtos);
+        }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetEventById(int id)
@@ -93,10 +145,30 @@ namespace AuthApp.Controllers
                 PrestataireId = eventItem.PrestataireId,
                 PrestataireName = eventItem.PrestataireName,
                 AdminName = eventItem.AdminName,
-                ClientName = eventItem.ClientName
+                ClientName = eventItem.ClientName,
+                PosId = eventItem.PosId,
+                ServiceId = eventItem.ServiceId,
             };
 
             return Ok(eventDto);
+        }
+
+        [HttpGet("user/{userId}")]
+        public async Task<ActionResult<IEnumerable<Events>>> GetEventsByUserIdAsync(string userId)
+        {
+            if (string.IsNullOrEmpty(userId))
+            {
+                return BadRequest("User ID cannot be null or empty.");
+            }
+
+            var events = await _eventRepo.GetEventsByUserIdAsync(userId);
+
+            if (events == null || !events.Any())
+            {
+                return NotFound("No events found for the specified user ID.");
+            }
+
+            return Ok(events);
         }
 
         [HttpPost]
@@ -198,79 +270,74 @@ namespace AuthApp.Controllers
             if (string.IsNullOrEmpty(request.Description))
                 return BadRequest("The description field is required.");
 
-            string? clientId = null;
+            if (request.PosId <= 0)
+                return BadRequest("A valid POS ID is required.");
 
-            // Récupère le GivenName du token
-            var givenName = User.FindFirst(ClaimTypes.GivenName)?.Value;
+            // Retrieve POS information along with the AdminId
+            var pos = await _posRepo.GetPOSByIdAsync(request.PosId.Value);
+            if (pos == null)
+                return BadRequest("Invalid POS ID.");
 
-            // Si le GivenName est présent, essayons de récupérer le clientId
-            if (!string.IsNullOrEmpty(givenName))
+            // Check if the selected service is available in the selected POS
+            var service = await _serviceRepo.GetServiceByIdAsync(request.ServiceId.Value);
+            if (service == null || service.POSId != request.PosId.Value)
+                return BadRequest("The selected service is not available in the chosen POS.");
+
+            // Get client name from the logged-in user
+            var clientName = User.FindFirst(ClaimTypes.GivenName)?.Value;
+            if (string.IsNullOrEmpty(clientName))
             {
-                var client = await _userRepo.GetByNameAsync(givenName);
-                if (client != null && client.RoleUser == UserRoles.Client)
-                {
-                    clientId = client.Id;
-                }
+                return BadRequest("Client is not authenticated.");
             }
 
-            // Si clientId n'est pas trouvé ou GivenName est absent, utiliser clientName fourni
-            if (string.IsNullOrEmpty(clientId))
-            {
-                if (string.IsNullOrEmpty(request.ClientName))
-                    return BadRequest("Client name must be provided if client is not authenticated.");
+            var client = await _userRepo.GetByNameAsync(clientName);
+            if (client == null || client.RoleUser != UserRoles.Client)
+                return BadRequest("Invalid client.");
 
-                var client = await _userRepo.GetByNameAsync(request.ClientName);
-                if (client == null || client.RoleUser != UserRoles.Client)
-                    return BadRequest("Invalid client name.");
+            // POS Prestataire check
+            if (string.IsNullOrEmpty(request.PrestataireName))
+                return BadRequest("A Prestataire must be selected.");
 
-                clientId = client.Id;
-            }
+            var prestataire = await _userRepo.GetByNameAsync(request.PrestataireName);
+            if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
+                return BadRequest("Invalid prestataire.");
 
-            // Validez l'entrée : soit PrestataireName soit AdminName doit être fourni
-            if (string.IsNullOrEmpty(request.PrestataireName) && string.IsNullOrEmpty(request.AdminName))
-                return BadRequest("Either PrestataireName or AdminName must be provided.");
-
-            if (!string.IsNullOrEmpty(request.PrestataireName) && !string.IsNullOrEmpty(request.AdminName))
-                return BadRequest("You can only assign the event to either a Prestataire or an Admin, not both.");
-
-            // Recherchez l'utilisateur par nom
-            string? prestataireId = null;
-            string? adminId = null;
-
-            if (!string.IsNullOrEmpty(request.PrestataireName))
-            {
-                var prestataire = await _userRepo.GetByNameAsync(request.PrestataireName);
-                if (prestataire == null || prestataire.RoleUser != UserRoles.Prestataire)
-                    return BadRequest("Invalid prestataire name.");
-                prestataireId = prestataire.Id;
-            }
-            if (!string.IsNullOrEmpty(request.AdminName))
-            {
-                var admin = await _userRepo.GetByNameAsync(request.AdminName);
-                if (admin == null || admin.RoleUser != UserRoles.Admin)
-                    return BadRequest("Invalid admin name.");
-                adminId = admin.Id;
-            }
+            // Check if the prestataire works at the selected POS
+            var isPrestataireInPos = await _posRepo.IsPrestataireInPos(request.PosId.Value, prestataire.Id);
+            if (!isPrestataireInPos)
+                return BadRequest("The selected prestataire does not work at the chosen POS.");
 
             DateTime eventDateTime = request.DateTime ?? DateTime.Now;
 
+            // Create a new event request with the AdminId from the POS
             var newRequest = new Events
             {
-                ClientId = clientId,
+                ClientId = client.Id,
                 Description = request.Description,
                 DateRequest = eventDateTime,
-                EventStatus = EventStatus.Pending,
-                PrestataireId = prestataireId,
-                AdminId = adminId,
-                PrestataireName = request.PrestataireName,
-                AdminName = request.AdminName,
-                ClientName = request.ClientName
+                EventStatus = EventStatus.Pending, // Always Pending
+                PrestataireId = prestataire.Id,
+                PrestataireName = prestataire.UserName,
+                ClientName = client.UserName,
+                PosId = request.PosId.Value,
+                ServiceId = request.ServiceId.Value,
+                AdminId = pos.AdminId // Include the AdminId from the POS
             };
 
+            // Add the new event request to the database
             await _eventRepo.AddAsync(newRequest);
+
+            // Check if the client is already associated with the admin (via the POS)
+            var isClientAssociated = await _posRepo.IsClientAssociatedWithAdmin(pos.AdminId, client.Id);
+            if (!isClientAssociated)
+            {
+                // Associate the client with the admin of the POS
+                await _posRepo.AddClientToAdminAsync(pos.AdminId, client.Id);
+            }
+
             await _eventRepo.SaveAsync();
 
-            // Retournez la réponse avec les détails de l'événement créé
+            // Return the created event with the details
             return CreatedAtAction(nameof(GetEventById), new { id = newRequest.Id }, new EventDto
             {
                 Id = newRequest.Id,
@@ -280,9 +347,10 @@ namespace AuthApp.Controllers
                 EventStatus = newRequest.EventStatus.ToString(),
                 PrestataireId = newRequest.PrestataireId,
                 PrestataireName = newRequest.PrestataireName,
-                AdminId = newRequest.AdminId,
-                AdminName = newRequest.AdminName,
-                ClientName = newRequest.ClientName
+                ClientName = newRequest.ClientName,
+                PosId = newRequest.PosId,
+                ServiceId = newRequest.ServiceId,
+                AdminId = newRequest.AdminId
             });
         }
 

@@ -15,14 +15,23 @@ namespace AuthApp.Services
         {
             _context = context;
         }
-        public async Task<IEnumerable<Events>> GetAllAsync()
+        public async Task<List<Events>> GetAllAsync()
         {
-            return await _context.Events.ToListAsync();
+            return await _context.Events
+                .Include(e => e.POS) // Eager load the POS entity
+                .ThenInclude(pos => pos.Admin) // Eager load the Admin associated with POS
+                .ToListAsync();
         }
-
         public async Task<Events> GetByIdAsync(int id)
         {
             return await _context.Events.FindAsync(id);
+        }
+
+        public async Task<IEnumerable<Events>> GetEventsByUserIdAsync(string userId)
+        {
+            return await _context.Events
+                .Where(e => e.ClientId == userId || e.PrestataireId == userId || e.AdminId ==userId)
+                .ToListAsync();
         }
 
         public async Task AddAsync(Events eventItem)

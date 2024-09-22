@@ -18,10 +18,13 @@ namespace AuthApp.Models
         public string? ClientName { get; set; }
         public string? PrestataireResponse { get; set; }
         public DateTime? CompletionDate { get; set; }
+        public int PosId { get; set; }
+        public POS POS { get; set; }
+        public int? ServiceId { get; set; }
 
         public virtual AppUser Client { get; set; }
-        public virtual AppUser Prestataire { get; set; }
-        public virtual AppUser Admin { get; set; }
+        public virtual AppUser? Prestataire { get; set; }
+        public virtual AppUser? Admin { get; set; }
 
     }
 }

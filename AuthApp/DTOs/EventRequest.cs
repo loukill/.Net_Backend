@@ -6,6 +6,8 @@
         public string Description { get; set; }
         public string? PrestataireName { get; set; }
         public string? AdminName { get; set; }
-        public DateTime? DateTime { get; set; } = default(DateTime?);
+        public DateTime? DateTime { get; set; }
+        public int? PosId { get; set; }
+        public int? ServiceId { get; set; }
     }
 }

@@ -12,5 +12,7 @@
         public string? AdminId { get; set; }
         public string? AdminName { get; set; }
         public string? ClientName { get; set; }
+        public int PosId { get; set; }
+        public int? ServiceId { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using AuthApp.Constants;
+using AuthApp.Data;
 using AuthApp.DTOs;
 using AuthApp.Models;
 using AuthApp.Services.Interfaces;
@@ -13,10 +14,12 @@ namespace AuthApp.Services
     public class UserRepo : IUserRepo
     {
         private readonly UserManager<AppUser> _userManager;
+        private readonly AppDbContext _context;
 
-        public UserRepo(UserManager<AppUser> userManager)
+        public UserRepo(UserManager<AppUser> userManager, AppDbContext context)
         {
             _userManager = userManager;
+            _context = context;
         }
 
         public async Task<AppUser> GetUserByUsernameAsync(string username)
@@ -28,38 +31,60 @@ namespace AuthApp.Services
         {
             return await _userManager.GetRolesAsync(user);
         }
-
-        public async Task<IEnumerable<UserDto>> GetAllPrestAsync()
+        public async Task<IEnumerable<UserDto>> GetClientsForAdminAsync(string adminId)
         {
-            var users = await _userManager.Users
-                                          .Where(u => u.RoleUser == UserRoles.Prestataire)
-                                          .ToListAsync();
+            var clients = await _context.POSs
+                .Where(pos => pos.AdminId == adminId)  // Find POSs where the adminId matches
+                .SelectMany(pos => pos.Clients)          // Select all Clients associated with these POSs
+                .Select(client => new UserDto
+                {
+                    UserId = client.Id,           // Use ClientId instead of Id
+                    UserName = client.UserName,  // Access UserName through the Client navigation property
+                    Email = client.Email,        // Access Email through the Client navigation property
+                    RoleUser = client.RoleUser,  // Access RoleUser through the Client navigation property
+                    POSNames = _context.POSs
+                                    .Where(p => p.Clients.Any(c => c.Id == client.Id))
+                                    .Select(p => p.POSName)  // Get POS names associated with this client
+                                    .ToList()
+                })
+                .ToListAsync();
 
-            var userDtos = users.Select(user => new UserDto
-            {
-                Id = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
-                RoleUser = user.RoleUser
-            });
-
-            return userDtos;
+            return clients;
         }
-        public async Task<IEnumerable<UserDto>> GetAllClientAsync()
+
+        public async Task<IEnumerable<PrestataireDto>> GetPrestatairesByPOSAsync(int posId)
         {
-            var users = await _userManager.Users
-                                          .Where(u => u.RoleUser == UserRoles.Client)
-                                          .ToListAsync();
+            return await _context.POSPrestataires
+                .Where(p => p.POSId == posId)
+                .Include(p => p.Prestataire) // Assuming there's a navigation property for Prestataire
+                .Select(p => new PrestataireDto
+                {
+                    PrestataireId = p.PrestataireId,
+                    UserName = p.Prestataire.UserName,
+                    Email = p.Prestataire.Email
+                })
+                .ToListAsync();
+        }
 
-            var userDtos = users.Select(user => new UserDto
-            {
-                Id = user.Id,
-                UserName = user.UserName,
-                Email = user.Email,
-                RoleUser = user.RoleUser
-            });
+        public async Task<IEnumerable<UserDto>> GetPrestatairesForAdminAsync(string adminId)
+        {
+            var prestataires = await _context.POSs
+                .Where(pos => pos.AdminId == adminId)  // Find POSs where the adminId matches
+                .SelectMany(pos => pos.Prestataires)    // Select all Prestataires associated with these POSs
+                .Select(prestataire => new UserDto
+                {
+                    UserId = prestataire.Id,   // Use PrestataireId instead of Id
+                    UserName = prestataire.UserName, // Access UserName through the Prestataire navigation property
+                    Email = prestataire.Email,     // Access Email through the Prestataire navigation property
+                    RoleUser = prestataire.RoleUser, // Access RoleUser through the Prestataire navigation property
+                    POSNames = _context.POSs
+                                    .Where(p => p.Prestataires.Any(pr => pr.Id == prestataire.Id))
+                                    .Select(p => p.POSName)  // Get POS names associated with this prestataire
+                                    .ToList()
+                })
+                .ToListAsync();
 
-            return userDtos;
+            return prestataires;
         }
 
 

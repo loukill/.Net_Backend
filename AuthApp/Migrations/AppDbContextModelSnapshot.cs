@@ -136,8 +136,10 @@ namespace AuthApp.Migrations
                     b.Property<int>("EventStatus")
                         .HasColumnType("integer");
 
+                    b.Property<int>("PosId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("PrestataireId")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("PrestataireName")
@@ -146,11 +148,16 @@ namespace AuthApp.Migrations
                     b.Property<string>("PrestataireResponse")
                         .HasColumnType("text");
 
+                    b.Property<int?>("ServiceId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AdminId");
 
                     b.HasIndex("ClientId");
+
+                    b.HasIndex("PosId");
 
                     b.HasIndex("PrestataireId");
 
@@ -179,6 +186,69 @@ namespace AuthApp.Migrations
                     b.ToTable("PasswordResetTokens");
                 });
 
+            modelBuilder.Entity("AuthApp.Models.POS", b =>
+                {
+                    b.Property<int>("POSId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("POSId"));
+
+                    b.Property<string>("AdminId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("POSLocation")
+                        .HasColumnType("text");
+
+                    b.Property<string>("POSName")
+                        .HasColumnType("text");
+
+                    b.HasKey("POSId");
+
+                    b.HasIndex("AdminId");
+
+                    b.ToTable("POSs");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POSClient", b =>
+                {
+                    b.Property<int>("POSId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ClientId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AdminId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("POSId", "ClientId");
+
+                    b.HasIndex("AdminId");
+
+                    b.HasIndex("ClientId");
+
+                    b.ToTable("POSClients");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POSPrestataire", b =>
+                {
+                    b.Property<int>("POSId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PrestataireId")
+                        .HasColumnType("text");
+
+                    b.HasKey("POSId", "PrestataireId");
+
+                    b.HasIndex("PrestataireId");
+
+                    b.ToTable("POSPrestataires");
+                });
+
             modelBuilder.Entity("AuthApp.Models.Service", b =>
                 {
                     b.Property<int>("Id")
@@ -195,11 +265,15 @@ namespace AuthApp.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("POSId")
+                        .HasColumnType("integer");
+
+                    b.Property<float>("Prix")
+                        .HasColumnType("real");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("POSId");
 
                     b.ToTable("Services");
                 });
@@ -210,6 +284,12 @@ namespace AuthApp.Migrations
                         .HasColumnType("text");
 
                     b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<int>("Id")
                         .HasColumnType("integer");
 
                     b.HasKey("UserId", "ServiceId");
@@ -247,19 +327,19 @@ namespace AuthApp.Migrations
                     b.HasData(
                         new
                         {
-                            Id = "c7b313b7-8d4b-4a28-89a1-483e1b5f38c1",
+                            Id = "5b862d84-429c-48b8-bb89-72512fc408bc",
                             Name = "Admin",
                             NormalizedName = "ADMIN"
                         },
                         new
                         {
-                            Id = "6014d24d-0b05-4edd-8226-381043793c9f",
+                            Id = "5f4b4a65-0b41-444d-a20f-8c4dc6c60148",
                             Name = "Prestataire",
                             NormalizedName = "PRESTATAIRE"
                         },
                         new
                         {
-                            Id = "57081f55-dc91-4650-a2af-3750c0edccff",
+                            Id = "bb90692d-64d0-4658-a106-0ae60d492240",
                             Name = "Client",
                             NormalizedName = "CLIENT"
                         });
@@ -383,17 +463,91 @@ namespace AuthApp.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("AuthApp.Models.POS", "POS")
+                        .WithMany()
+                        .HasForeignKey("PosId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("AuthApp.Models.AppUser", "Prestataire")
                         .WithMany("AssignedRequests")
                         .HasForeignKey("PrestataireId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admin");
+
+                    b.Navigation("Client");
+
+                    b.Navigation("POS");
+
+                    b.Navigation("Prestataire");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POS", b =>
+                {
+                    b.HasOne("AuthApp.Models.AppUser", "Admin")
+                        .WithMany("AdminPOSs")
+                        .HasForeignKey("AdminId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Admin");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POSClient", b =>
+                {
+                    b.HasOne("AuthApp.Models.AppUser", "Admin")
+                        .WithMany()
+                        .HasForeignKey("AdminId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AuthApp.Models.AppUser", "Client")
+                        .WithMany("POSClients")
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AuthApp.Models.POS", "POS")
+                        .WithMany("POSClients")
+                        .HasForeignKey("POSId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Admin");
 
                     b.Navigation("Client");
 
+                    b.Navigation("POS");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POSPrestataire", b =>
+                {
+                    b.HasOne("AuthApp.Models.POS", "POS")
+                        .WithMany("POSPrestataires")
+                        .HasForeignKey("POSId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("AuthApp.Models.AppUser", "Prestataire")
+                        .WithMany("POSPrestataires")
+                        .HasForeignKey("PrestataireId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("POS");
+
                     b.Navigation("Prestataire");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.Service", b =>
+                {
+                    b.HasOne("AuthApp.Models.POS", "POS")
+                        .WithMany("Services")
+                        .HasForeignKey("POSId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("POS");
                 });
 
             modelBuilder.Entity("AuthApp.Models.UserService", b =>
@@ -468,11 +622,26 @@ namespace AuthApp.Migrations
 
             modelBuilder.Entity("AuthApp.Models.AppUser", b =>
                 {
+                    b.Navigation("AdminPOSs");
+
                     b.Navigation("AssignedRequests");
 
                     b.Navigation("CreatedRequests");
 
+                    b.Navigation("POSClients");
+
+                    b.Navigation("POSPrestataires");
+
                     b.Navigation("UserServices");
+                });
+
+            modelBuilder.Entity("AuthApp.Models.POS", b =>
+                {
+                    b.Navigation("POSClients");
+
+                    b.Navigation("POSPrestataires");
+
+                    b.Navigation("Services");
                 });
 
             modelBuilder.Entity("AuthApp.Models.Service", b =>

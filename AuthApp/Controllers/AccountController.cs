@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity.UI.Services;
+using AuthApp.Data;
 
 
 namespace AuthApp.Controllers
@@ -25,7 +26,10 @@ namespace AuthApp.Controllers
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AccountController> _logger;
-        public AccountController(UserManager<AppUser> userManager, ITokenService tokenService, SignInManager<AppUser> signinManager, IEmailService emailService, IConfiguration configuration, ILogger<AccountController> logger)
+        private readonly AppDbContext _context;
+        private readonly string _uploadsFolderPath;
+        private readonly string _baseUrl;
+        public AccountController(UserManager<AppUser> userManager, ITokenService tokenService, SignInManager<AppUser> signinManager, IEmailService emailService, IConfiguration configuration, ILogger<AccountController> logger, AppDbContext appDbContext)
         {
             _userManager = userManager;
             _tokenService = tokenService;
@@ -33,6 +37,15 @@ namespace AuthApp.Controllers
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
+            _context = appDbContext;
+            _baseUrl = configuration["App:BaseUrl"];
+            _uploadsFolderPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+
+            // Ensure the uploads directory exists
+            if (!Directory.Exists(_uploadsFolderPath))
+            {
+                Directory.CreateDirectory(_uploadsFolderPath);
+            }
         }
 
         [HttpPost("login")]
@@ -106,57 +119,49 @@ namespace AuthApp.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterDto registerDto)
+        public async Task<IActionResult> Register([FromForm] RegisterDto registerDto, IFormFile? posImage)
         {
             try
             {
-                // Validate the model
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
                 }
 
-                // Check if the email is provided
                 if (string.IsNullOrEmpty(registerDto.Email))
                 {
                     return BadRequest("Email cannot be null or empty.");
                 }
 
-                // Check if the email already exists in the system
-                var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
-                if (existingUser != null)
+                // Vérifier si le rôle spécifié est Admin ou Client
+                if (registerDto.RoleUser != UserRoles.Admin && registerDto.RoleUser != UserRoles.Client)
                 {
-                    return BadRequest("Email is already in use. Please choose a different email.");
+                    return BadRequest("You are not allowed to create an account with this role.");
                 }
 
-                // Validate the user role
+
                 if (!Enum.IsDefined(typeof(UserRoles), registerDto.RoleUser))
                 {
                     return BadRequest("Invalid role specified.");
                 }
 
-                // Create the user
                 var appUser = new AppUser
                 {
                     UserName = registerDto.UserName,
                     Email = registerDto.Email,
-                    RoleUser = (UserRoles)registerDto.RoleUser,
-                    IsValidated = false // Not validated by default
+                    RoleUser = (UserRoles)Enum.Parse(typeof(UserRoles), registerDto.RoleUser.ToString()),
+                    PhoneNumber = registerDto.PhoneNumber,
+                    IsValidated = false
                 };
 
                 var createdUser = await _userManager.CreateAsync(appUser, registerDto.Password);
 
-                // Check if the user creation was successful
                 if (createdUser.Succeeded)
                 {
-                    // Assign the role to the user
                     var roleResult = await _userManager.AddToRoleAsync(appUser, registerDto.RoleUser.ToString());
                     if (roleResult.Succeeded)
                     {
-                        // Create validation link for admin
-                        var validationLink = $"{_configuration["App:BaseUrl"]}/api/admin/confirm-email?userId={appUser.Id}";
-
-                        // Send email to admin
+                        var validationLink = $"{_baseUrl}/api/admin/confirm-email?userId={appUser.Id}";
                         await _emailService.SendEmailValidationAsync(validationLink);
 
                         return Ok(new { message = "Registration successful! Admin will review and validate your account.", userId = appUser.Id });
@@ -168,18 +173,38 @@ namespace AuthApp.Controllers
                 }
                 else
                 {
-                    // Clean up by deleting the user if creation failed
                     await _userManager.DeleteAsync(appUser);
                     return StatusCode(500, createdUser.Errors);
                 }
             }
             catch (Exception ex)
             {
-                return StatusCode(500, ex.Message); // Return a more descriptive error message
+                return StatusCode(500, ex.Message);
             }
         }
 
-        [HttpGet("check-validation-status/{userId}")]
+        private async Task<string> SaveFileAsync(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                throw new ArgumentException("No file uploaded");
+            }
+
+            var fileName = Path.GetFileNameWithoutExtension(file.FileName);
+            var fileExtension = Path.GetExtension(file.FileName);
+            var newFileName = $"{fileName}_{Guid.NewGuid()}{fileExtension}";
+            var filePath = Path.Combine(_uploadsFolderPath, newFileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // Return the URL of the uploaded file
+            return $"{_baseUrl}/uploads/{newFileName}";
+        }
+
+    [HttpGet("check-validation-status/{userId}")]
         public async Task<IActionResult> CheckValidationStatus(string userId)
         {
             var user = await _userManager.FindByIdAsync(userId);
@@ -287,6 +312,5 @@ namespace AuthApp.Controllers
 
             return Ok(new { message = "Password has been reset successfully." });
         }
-
     }
 }
